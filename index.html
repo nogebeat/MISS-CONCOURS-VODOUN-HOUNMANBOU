@@ -5,53 +5,67 @@
     <title>Formulaire d'inscription Vodoun</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f2f2f2, #e0eafc);
+            margin: 0;
             padding: 30px;
         }
         .form-container {
-            max-width: 500px;
-            background: white;
-            padding: 20px;
+            max-width: 600px;
+            background: #fff;
+            padding: 30px;
             margin: auto;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
         }
         h2 {
             text-align: center;
-            color: #333;
+            color: #222;
+            margin-bottom: 20px;
         }
         label {
             display: block;
             margin-top: 15px;
-            font-weight: bold;
+            font-weight: 600;
+            color: #333;
         }
-        input, select {
+        input, select, textarea {
             width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            border-radius: 5px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            border-radius: 8px;
             border: 1px solid #ccc;
+            font-size: 15px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 60px;
         }
         .submit-btn {
             background-color: #007BFF;
             color: white;
-            margin-top: 20px;
-            padding: 10px;
+            margin-top: 25px;
+            padding: 12px;
             border: none;
             width: 100%;
+            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
-            border-radius: 5px;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
         }
         .submit-btn:hover {
             background-color: #0056b3;
+        }
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
 
 <div class="form-container">
-    <h2>Formulaire d'Inscription</h2>
+    <h2>Formulaire d'Inscription au Vodoun</h2>
     <form action="traitement.php" method="POST">
         <label for="nom">Nom et Prénom</label>
         <input type="text" id="nom" name="nom" required>
@@ -62,12 +76,21 @@
         <label for="ethnie">Ethnie</label>
         <input type="text" id="ethnie" name="ethnie" required>
 
-        <label for="vodoun">Pratiquez-vous le culte vodoun ?</label>
-        <select id="vodoun" name="vodoun" required>
+        <label for="vodoun">Divinité Vodoun associée</label>
+        <select id="vodoun" name="vodoun" required onchange="handleVodounChange()">
             <option value="">-- Sélectionnez --</option>
-            <option value="oui">Oui</option>
-            <option value="non">Non</option>
+            <option value="Thron">1 - Thron</option>
+            <option value="Dan">2 - Dan</option>
+            <option value="Mami">3 - Mami</option>
+            <option value="Lissa">4 - Lissa</option>
+            <option value="Sakpata">5 - Sakpata</option>
+            <option value="Autres">6 - Autres (Préciser)</option>
         </select>
+
+        <div id="autres-container" class="hidden">
+            <label for="vodoun_autres">Veuillez préciser la divinité</label>
+            <input type="text" id="vodoun_autres" name="vodoun_autres">
+        </div>
 
         <label for="gmail">Adresse Gmail</label>
         <input type="email" id="gmail" name="gmail" pattern=".+@gmail\.com" required>
@@ -75,6 +98,19 @@
         <button type="submit" class="submit-btn">S'inscrire</button>
     </form>
 </div>
+
+<script>
+    function handleVodounChange() {
+        const select = document.getElementById('vodoun');
+        const autresContainer = document.getElementById('autres-container');
+        if (select.value === 'Autres') {
+            autresContainer.classList.remove('hidden');
+        } else {
+            autresContainer.classList.add('hidden');
+            document.getElementById('vodoun_autres').value = '';
+        }
+    }
+</script>
 
 </body>
 </html>
