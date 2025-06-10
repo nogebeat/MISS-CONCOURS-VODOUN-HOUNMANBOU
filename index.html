@@ -23,6 +23,19 @@
             color: #222;
             margin-bottom: 20px;
         }
+        .payment-info {
+            background: linear-gradient(135deg, #007BFF, #0056b3);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .payment-amount {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
         label {
             display: block;
             margin-top: 15px;
@@ -36,50 +49,94 @@
             border-radius: 8px;
             border: 1px solid #ccc;
             font-size: 15px;
+            box-sizing: border-box;
         }
         textarea {
             resize: vertical;
             min-height: 60px;
         }
         .submit-btn {
-            background-color: #007BFF;
+            background-color: #28a745;
             color: white;
             margin-top: 25px;
-            padding: 12px;
+            padding: 15px;
             border: none;
             width: 100%;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
             border-radius: 8px;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
         }
         .submit-btn:hover {
-            background-color: #0056b3;
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+        .submit-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            transform: none;
         }
         .hidden {
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007BFF;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
             display: none;
         }
     </style>
 </head>
 <body>
-
 <div class="form-container">
     <h2>Formulaire d'Inscription au Vodoun</h2>
-    <form action="traitement.php" method="POST">
-        <label for="nom">Nom et Prénom</label>
+    
+    <div class="payment-info">
+        <div>💳 Frais d'inscription</div>
+        <div class="payment-amount">1,000 FCFA</div>
+        <div>Paiement sécurisé via FedaPay</div>
+    </div>
+    
+    <form id="inscriptionForm">
+        <label for="nom">Nom et Prénom *</label>
         <input type="text" id="nom" name="nom" required>
-
-        <label for="age">Âge</label>
+        
+        <label for="age">Âge *</label>
         <input type="number" id="age" name="age" min="0" required>
-
-        <label for="telephone">Téléphone</label>
-        <input type="number" id="telephone" name="telephone" required>
-
-        <label for="ethnie">Ethnie</label>
+        
+        <label for="ethnie">Ethnie *</label>
         <input type="text" id="ethnie" name="ethnie" required>
-
-        <label for="vodoun">Divinité Vodoun associée</label>
+        
+        <label for="vodoun">Divinité Vodoun associée *</label>
         <select id="vodoun" name="vodoun" required onchange="handleVodounChange()">
             <option value="">-- Sélectionnez --</option>
             <option value="Thron">1 - Thron</option>
@@ -89,16 +146,26 @@
             <option value="Sakpata">5 - Sakpata</option>
             <option value="Autres">6 - Autres (Préciser)</option>
         </select>
-
+        
         <div id="autres-container" class="hidden">
             <label for="vodoun_autres">Veuillez préciser la divinité</label>
             <input type="text" id="vodoun_autres" name="vodoun_autres">
         </div>
-
-        <label for="gmail">Adresse Gmail</label>
+        
+        <label for="gmail">Adresse Gmail *</label>
         <input type="email" id="gmail" name="gmail" pattern=".+@gmail\.com" required>
-
-        <button type="submit" class="submit-btn">S'inscrire</button>
+        
+        <button type="submit" class="submit-btn" id="submitBtn">
+            Procéder au Paiement - 1,000 FCFA
+        </button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Redirection vers le paiement...</p>
+        </div>
+        
+        <div class="error" id="errorMessage"></div>
+        <div class="success" id="successMessage"></div>
     </form>
 </div>
 
@@ -106,14 +173,98 @@
     function handleVodounChange() {
         const select = document.getElementById('vodoun');
         const autresContainer = document.getElementById('autres-container');
+        const autresInput = document.getElementById('vodoun_autres');
+        
         if (select.value === 'Autres') {
             autresContainer.classList.remove('hidden');
+            autresInput.required = true;
         } else {
             autresContainer.classList.add('hidden');
-            document.getElementById('vodoun_autres').value = '';
+            autresInput.required = false;
+            autresInput.value = '';
         }
     }
-</script>
 
+    function showError(message) {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    function showSuccess(message) {
+        const successDiv = document.getElementById('successMessage');
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+    }
+
+    function showLoading(show) {
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        if (show) {
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Traitement en cours...';
+        } else {
+            loading.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Procéder au Paiement - 1,000 FCFA';
+        }
+    }
+
+    document.getElementById('inscriptionForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        showLoading(true);
+        
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        
+        if (data.vodoun === 'Autres' && !data.vodoun_autres) {
+            showError('Veuillez préciser la divinité Vodoun');
+            showLoading(false);
+            return;
+        }
+        
+        try {
+            const response = await fetch('/inscription', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.payment_url) {
+                showSuccess('Redirection vers le paiement...');
+                
+                setTimeout(() => {
+                    window.location.href = result.payment_url;
+                }, 2000);
+            } else {
+                showError(result.message || 'Erreur lors du traitement de l\'inscription');
+                showLoading(false);
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            showError('Erreur de connexion. Veuillez réessayer.');
+            showLoading(false);
+        }
+    });
+
+    document.getElementById('gmail').addEventListener('input', function(e) {
+        const email = e.target.value;
+        if (email && !email.endsWith('@gmail.com')) {
+            e.target.setCustomValidity('Veuillez utiliser une adresse Gmail (@gmail.com)');
+        } else {
+            e.target.setCustomValidity('');
+        }
+    });
+</script>
 </body>
 </html>
