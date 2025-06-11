@@ -1,233 +1,115 @@
+// server.js
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
-const cors = require('cors');
-const axios = require('axios');
-
+const sendMail = require('./config/mail'); // Assurez-vous que le chemin est correct
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-const FEDAPAY_CONFIG = {
-    baseURL: 'https://api.fedapay.com/v1',
-    publicKey: process.env.FEDAPAY_PUBLIC_KEY || 'pk_sandbox_votre_cle_publique',
-    privateKey: process.env.FEDAPAY_PRIVATE_KEY || 'sk_sandbox_votre_cle_privee',
-    amount: 1000,
-    currency: 'XOF'
-};
-
-app.use(cors());
+// Middleware
+app.use(express.json());
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+
+// Servir les fichiers statiques depuis le dossier public
 app.use(express.static('public'));
 
+// Route pour servir la page principale
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html')); // Le fichier index.html à la racine
 });
 
+// Route pour traiter l'inscription
 app.post('/inscription', async (req, res) => {
-    try {
-        const { nom, age, ethnie, vodoun, vodoun_autres, gmail } = req.body;
+    const { nom, age, telephone, ethnie, vodoun, vodoun_autres, gmail } = req.body;
 
-        if (!nom || !age || !ethnie || telephone || !vodoun || !gmail) {
-            return res.status(400).json({
-                success: false,
-                message: 'Tous les champs obligatoires doivent être remplis'
-            });
-        }
-
-        const inscriptionData = {
-            nom,
-            age: parseInt(age),
-            ethnie,
-            vodoun: vodoun === 'Autres' ? vodoun_autres : vodoun,
-            gmail,
-            dateInscription: new Date().toISOString(),
-            statut: 'en_attente_paiement'
-        };
-
-        const transactionData = {
-            description: `Inscription Vodoun - ${nom}`,
-            amount: FEDAPAY_CONFIG.amount,
-            currency: FEDAPAY_CONFIG.currency,
-            callback_url: `${req.protocol}://${req.get('host')}/webhook/fedapay`,
-            return_url: `${req.protocol}://${req.get('host')}/success`,
-            cancel_url: `${req.protocol}://${req.get('host')}/cancel`,
-            custom_metadata: {
-                inscription_id: Date.now().toString(),
-                nom: nom,
-                gmail: gmail
-            }
-        };
-
-        const fedapayResponse = await axios.post(
-            `${FEDAPAY_CONFIG.baseURL}/transactions`,
-            transactionData,
-            {
-                headers: {
-                    'Authorization': `Bearer ${FEDAPAY_CONFIG.privateKey}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        if (fedapayResponse.data && fedapayResponse.data.token) {
-            global.pendingInscriptions = global.pendingInscriptions || {};
-            global.pendingInscriptions[fedapayResponse.data.token] = inscriptionData;
-
-            res.json({
-                success: true,
-                payment_url: fedapayResponse.data.url,
-                transaction_token: fedapayResponse.data.token,
-                message: 'Redirection vers le paiement...'
-            });
-        } else {
-            throw new Error('Erreur lors de la création de la transaction');
-        }
-
-    } catch (error) {
-        console.error('Erreur inscription:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Erreur lors du traitement de l\'inscription'
+    // Validation des données
+    if (!nom || !age || !telephone || !ethnie || !vodoun || !gmail) {
+        return res.json({ 
+            success: false, 
+            message: 'Tous les champs obligatoires doivent être remplis.' 
         });
     }
-});
 
-app.post('/webhook/fedapay', (req, res) => {
-    try {
-        const { transaction, event } = req.body;
-
-        if (event === 'transaction.approved') {
-            const inscriptionData = global.pendingInscriptions[transaction.token];
-            
-            if (inscriptionData) {
-                inscriptionData.statut = 'payee';
-                inscriptionData.transaction_id = transaction.id;
-                inscriptionData.datePaiement = new Date().toISOString();
-
-                global.completedInscriptions = global.completedInscriptions || [];
-                global.completedInscriptions.push(inscriptionData);
-
-                delete global.pendingInscriptions[transaction.token];
-
-                console.log('Inscription confirmée:', inscriptionData);
-            }
-        }
-
-        res.status(200).json({ received: true });
-    } catch (error) {
-        console.error('Erreur webhook:', error);
-        res.status(500).json({ error: 'Erreur webhook' });
+    // Validation de l'email Gmail
+    if (!gmail.endsWith('@gmail.com')) {
+        return res.json({ 
+            success: false, 
+            message: 'Veuillez utiliser une adresse Gmail valide.' 
+        });
     }
-});
 
-app.get('/success', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="fr">
-        <head>
-            <meta charset="UTF-8">
-            <title>Inscription Réussie</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
-                .message { font-size: 18px; color: #333; }
-                .btn { 
-                    background: #007BFF; color: white; padding: 10px 20px; 
-                    text-decoration: none; border-radius: 5px; margin-top: 20px; 
-                    display: inline-block;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="success">✅ Inscription Réussie !</div>
-            <div class="message">
-                Votre paiement a été confirmé et votre inscription au Vodoun est maintenant active.
-                <br><br>
-                Vous recevrez bientôt un email de confirmation.
-            </div>
-            <a href="/" class="btn">Retour à l'accueil</a>
-        </body>
-        </html>
-    `);
-});
+    // Déterminer la divinité
+    const divinite = vodoun === 'Autres' ? vodoun_autres : vodoun;
+    
+    if (vodoun === 'Autres' && !vodoun_autres) {
+        return res.json({ 
+            success: false, 
+            message: 'Veuillez préciser la divinité Vodoun.' 
+        });
+    }
 
-app.get('/cancel', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="fr">
-        <head>
-            <meta charset="UTF-8">
-            <title>Paiement Annulé</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                .cancel { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
-                .message { font-size: 18px; color: #333; }
-                .btn { 
-                    background: #007BFF; color: white; padding: 10px 20px; 
-                    text-decoration: none; border-radius: 5px; margin-top: 20px; 
-                    display: inline-block;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="cancel">❌ Paiement Annulé</div>
-            <div class="message">
-                Votre paiement a été annulé. Votre inscription n'est pas confirmée.
-                <br><br>
-                Vous pouvez réessayer quand vous le souhaitez.
-            </div>
-            <a href="/" class="btn">Retour à l'accueil</a>
-        </body>
-        </html>
-    `);
-});
+    // Message à envoyer par email
+    const message = `
+Nouvelle inscription au Vodoun :
 
-// Route pour vérifier le statut d'une transaction
-app.get('/status/:token', async (req, res) => {
+👤 Nom : ${nom}
+🎂 Âge : ${age}
+📞 Téléphone : ${telephone}
+🌍 Ethnie : ${ethnie}
+🧿 Divinité : ${divinite}
+📧 Gmail : ${gmail}
+💰 Montant à payer : 1,000 FCFA
+📱 Numéro de paiement : 97 00 00 00
+📝 Référence : ${gmail}
+
+---
+Inscription effectuée le : ${new Date().toLocaleString('fr-FR')}
+`;
+
     try {
-        const { token } = req.params;
+        // Envoyer l'email de confirmation
+        const emailResult = await sendMail(message, gmail, 'Confirmation d\'inscription Vodoun');
         
-        const response = await axios.get(
-            `${FEDAPAY_CONFIG.baseURL}/transactions/${token}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${FEDAPAY_CONFIG.privateKey}`
-                }
-            }
-        );
-
-        res.json({
-            success: true,
-            transaction: response.data
+        console.log(`✅ Inscription ET email réussis pour ${nom} (${gmail})`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Inscription enregistrée et email envoyé avec succès.',
+            emailSent: true
         });
+        
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Erreur lors de la vérification du statut'
+        console.error('❌ Erreur lors de l\'envoi de l\'email :', error.message);
+        
+        res.json({ 
+            success: false, 
+            message: 'Erreur lors de l\'envoi de l\'email de confirmation : ' + error.message,
+            emailSent: false
         });
     }
 });
 
-app.get('/admin/inscriptions', (req, res) => {
-    const inscriptions = global.completedInscriptions || [];
+// Route pour obtenir des statistiques (optionnel)
+app.get('/stats', (req, res) => {
     res.json({
-        success: true,
-        inscriptions: inscriptions,
-        total: inscriptions.length
+        status: 'Service actif',
+        timestamp: new Date().toISOString()
     });
 });
 
+// Gestion des erreurs 404
+app.use((req, res) => {
+    res.status(404).json({ 
+        success: false, 
+        message: 'Route non trouvée' 
+    });
+});
+
+// Démarrage du serveur
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-    console.log(`📝 Formulaire disponible sur: http://localhost:${PORT}`);
-    console.log(`💳 Paiement configuré: ${FEDAPAY_CONFIG.amount} ${FEDAPAY_CONFIG.currency}`);
+    console.log(`📱 Accédez à votre site: http://localhost:${PORT}`);
+    console.log(`📧 Service email configuré`);
 });
 
-process.on('uncaughtException', (error) => {
-    console.error('Erreur non capturée:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Promesse rejetée:', reason);
-});
+module.exports = app;
